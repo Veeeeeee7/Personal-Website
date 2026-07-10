@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "personal-website",
+  "compatibility_date": "2026-07-10",
+
+  // No "main" key on purpose. Without it, Wrangler deploys `dist/` as pure
+  // static assets — no Worker script, no Astro adapter, nothing to cold-start.
+  // Adding "main" is what triggers `astro add cloudflare` and the hybrid build.
+  "assets": {
+    "directory": "./dist"
+  },
+
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  }
+}
