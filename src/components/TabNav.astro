@@ -1,0 +1,24 @@
+---
+const tabs = [
+  { key: 'highlights', label: 'Highlights' },
+  { key: 'activity', label: 'Recent activity' },
+] as const;
+---
+
+<div class="tabs" role="tablist" aria-label="Sections">
+  {
+    tabs.map((tab, i) => (
+      <button
+        type="button"
+        role="tab"
+        id={`tab-${tab.key}`}
+        data-tab={tab.key}
+        aria-controls={`panel-${tab.key}`}
+        aria-selected={i === 0 ? 'true' : 'false'}
+        tabindex={i === 0 ? 0 : -1}
+      >
+        {tab.label}
+      </button>
+    ))
+  }
+</div>

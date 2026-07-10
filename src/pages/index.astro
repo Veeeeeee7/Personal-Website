@@ -1,0 +1,114 @@
+---
+import Base from '../layouts/Base.astro';
+import SocialLinks from '../components/SocialLinks.astro';
+import TabNav from '../components/TabNav.astro';
+import { site, facts, avatar } from '../data/site';
+import { highlights } from '../data/highlights';
+import { activity } from '../data/activity';
+---
+
+<Base>
+  <header class="hero profile">
+    <picture class="avatar">
+      <source srcset={avatar.webp} type="image/webp" />
+      <img src={avatar.jpg} alt={avatar.alt} width="480" height="480" fetchpriority="high" />
+    </picture>
+
+    <div class="hero-text">
+      <h1>{site.name}</h1>
+      <ul class="facts">
+        {facts.map((fact) => <li>{fact}</li>)}
+      </ul>
+
+      <div class="link-row">
+        <SocialLinks />
+        <a class="cv-pill" href="/cv" aria-label="Curriculum vitae" title="CV">
+          <span class="cv-mark" aria-hidden="true">CV</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <TabNav />
+
+  <section class="panel" id="panel-highlights" role="tabpanel" aria-labelledby="tab-highlights">
+    <div class="cards">
+      {
+        highlights.map((h) => (
+          <a class="card" href={h.href} target="_blank" rel="noopener">
+            <div class="card-head">
+              <h3>{h.title}</h3>
+              <span class="meta">{h.meta}</span>
+            </div>
+            <p class="authors">{h.authors}</p>
+            <p>{h.blurb}</p>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
+    <ul class="timeline">
+      {
+        activity.map((item) => (
+          <li>
+            <span class="date">{item.date}</span>
+            <div class="text">
+              <strong class="item-title">
+                {item.href ? <a href={item.href}>{item.title}</a> : item.title}
+              </strong>
+              <p>{item.text}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <noscript>
+    <style>
+      .tabs {
+        display: none;
+      }
+      .panel[hidden] {
+        display: block !important;
+      }
+    </style>
+  </noscript>
+
+</Base>
+
+<script is:inline>
+  (() => {
+    const tabs = [...document.querySelectorAll('[role="tab"]')];
+    if (!tabs.length) return;
+
+    const show = (key, push) => {
+      tabs.forEach((tab) => {
+        const on = tab.dataset.tab === key;
+        tab.setAttribute('aria-selected', String(on));
+        tab.tabIndex = on ? 0 : -1;
+        document.getElementById('panel-' + tab.dataset.tab).hidden = !on;
+      });
+      if (push) history.replaceState(null, '', key === 'highlights' ? location.pathname : '#' + key);
+    };
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => show(tab.dataset.tab, true));
+      // Left/right arrows move between tabs, per the ARIA tabs pattern.
+      tab.addEventListener('keydown', (e) => {
+        const dir = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!dir) return;
+        e.preventDefault();
+        const next = tabs[(i + dir + tabs.length) % tabs.length];
+        next.focus();
+        show(next.dataset.tab, true);
+      });
+    });
+
+    // Deep links: /#activity opens straight to that tab.
+    const hash = location.hash.slice(1);
+    if (tabs.some((t) => t.dataset.tab === hash)) show(hash, false);
+  })();
+</script>
