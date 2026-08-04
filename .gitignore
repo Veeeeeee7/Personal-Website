@@ -11,3 +11,12 @@ push.sh
 
 # Wrangler
 .wrangler/
+
+# RL: generated test fixtures and training checkpoints.
+# public/policy/ is NOT ignored — the exported weights are the deployed
+# agent and belong in the repo.
+rl/fixtures.json
+rl/policy_fixtures.json
+rl/checkpoints/
+rl/__pycache__/
+.venv/

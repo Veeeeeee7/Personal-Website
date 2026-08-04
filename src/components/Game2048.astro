@@ -1,0 +1,1101 @@
+---
+// The board, the controls, and the stats readout. All of the logic
+// lives in src/game/ — this file is the view and the glue.
+//
+// There is no human/AI mode. The human is always the default player:
+// the arrow keys move the board whenever it's on screen. The play
+// button hands the board to the agent, which plays on from the current
+// position until you press it again to take back over.
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { SPEEDS, DEFAULT_SPEED_INDEX } from '../game/agent';
+
+// Check for the trained weights at build time rather than letting the
+// client discover a 404. The site is static, so this is free — and it
+// keeps the console clean until the first policy is published.
+const hasPolicy = existsSync(
+  fileURLToPath(new URL('../../public/policy/manifest.json', import.meta.url)),
+);
+---
+
+<section class="game" aria-label="2048" data-has-policy={String(hasPolicy)}>
+  <!-- Scoreboard ------------------------------------------------ -->
+  <div class="scorebar">
+    <div class="score-group">
+      <div class="score">
+        <span class="score-label">Score</span>
+        <span class="score-value" data-score>0</span>
+      </div>
+      <div class="score">
+        <span class="score-label">Best</span>
+        <span class="score-value" data-best>0</span>
+      </div>
+    </div>
+    <button type="button" class="btn btn-ghost" data-new>New Game</button>
+  </div>
+
+  <!-- Controls -------------------------------------------------- -->
+  <div class="controls">
+    <button type="button" class="btn btn-play" data-play aria-pressed="false">
+      <svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"
+        ><path d="M4.5 2.6v10.8a.6.6 0 0 0 .93.5l8.1-5.4a.6.6 0 0 0 0-1l-8.1-5.4a.6.6 0 0 0-.93.5Z"
+        ></path></svg
+      >
+      <svg class="icon-stop" viewBox="0 0 16 16" aria-hidden="true"
+        ><rect x="3.5" y="3.5" width="9" height="9" rx="1.2"></rect></svg
+      >
+      <span data-play-label>Watch AI Play</span>
+    </button>
+
+    <label class="speed">
+      <span class="speed-label">Speed</span>
+      <input
+        type="range"
+        min="0"
+        max={SPEEDS.length - 1}
+        step="1"
+        value={DEFAULT_SPEED_INDEX}
+        data-speed
+        aria-label="Playback speed"
+      />
+      <output data-speed-out>{SPEEDS[DEFAULT_SPEED_INDEX].label}</output>
+    </label>
+  </div>
+
+  <!-- Board ----------------------------------------------------- -->
+  <div class="board-frame">
+    <div class="board" data-board tabindex="0" role="application" aria-label="2048 board">
+      <div class="grid" aria-hidden="true">
+        {Array.from({ length: 16 }).map(() => <div class="cell" />)}
+      </div>
+      <div class="tiles" data-tiles></div>
+
+      <div class="overlay" data-overlay hidden>
+        <p class="overlay-title" data-overlay-title></p>
+        <p class="overlay-sub" data-overlay-sub></p>
+      </div>
+    </div>
+
+    <!-- Footnote hugging the board's bottom edge. -->
+    <p class="hint" data-hint>Arrow keys or WASD to move. Swipe on touch.</p>
+  </div>
+
+  <!-- Stats ----------------------------------------------------- -->
+  <dl class="stats" data-stats>
+    <div><dt>Agent</dt><dd data-stat-agent>—</dd></div>
+    <div><dt>Games</dt><dd data-stat-games>0</dd></div>
+    <div><dt>Wins</dt><dd data-stat-wins>0</dd></div>
+    <div><dt>Moves</dt><dd data-stat-moves>0</dd></div>
+    <div><dt>Best tile</dt><dd data-stat-maxtile>—</dd></div>
+    <div><dt>Rate</dt><dd data-stat-rate>—</dd></div>
+  </dl>
+</section>
+
+<script>
+  import {
+    type Board,
+    type Dir,
+    Dir as D,
+    WIN_EXPONENT,
+    faceValue,
+    isGameOver,
+    maxTile,
+    move,
+    newBoard,
+    spawnTile,
+  } from '../game/engine';
+  import { AgentRunner, SPEEDS, animationDuration, type StepResult } from '../game/agent';
+  import { HeuristicPolicy } from '../game/heuristic';
+  import { loadNTuplePolicy, type Policy } from '../game/policy';
+
+  const root = document.querySelector<HTMLElement>('.game');
+  if (root) init(root);
+
+  function init(root: HTMLElement) {
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
+      root.querySelector<T>(sel) as T;
+
+    const tilesEl = $('[data-tiles]');
+    const boardEl = $('[data-board]');
+    const overlayEl = $('[data-overlay]');
+    const playBtn = $<HTMLButtonElement>('[data-play]');
+    const speedInput = $<HTMLInputElement>('[data-speed]');
+
+    // ── State ────────────────────────────────────────────────
+    interface Tile {
+      id: number;
+      value: number;
+      cell: number;
+      el: HTMLElement;
+      /** Set when this tile is the survivor of a merge landing this move. */
+      nextValue?: number;
+    }
+
+    let board: Board = new Uint8Array(16);
+    let byCell: Array<Tile | null> = new Array(16).fill(null);
+    let tileId = 0;
+    let score = 0;
+    let best = readBest();
+    let moves = 0;
+    let games = 0;
+    let wins = 0;
+    /** Win overlay fires once per game, not once per move past 2048. */
+    let celebrated = false;
+    let policy: Policy = new HeuristicPolicy();
+    let rateSamples: number[] = [];
+    let lastMoveAt = 0;
+
+    /**
+     * Visual commits are deferred until tiles finish sliding. If another
+     * move arrives first we flush, so the logical board and the DOM can
+     * never drift apart by more than one move.
+     */
+    let pending: { timer: number; commit: () => void } | null = null;
+
+    function flush() {
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      const { commit } = pending;
+      pending = null;
+      commit();
+    }
+
+    // ── Rendering ────────────────────────────────────────────
+    function place(tile: Tile) {
+      tile.el.style.setProperty('--col', String(tile.cell % 4));
+      tile.el.style.setProperty('--row', String(Math.floor(tile.cell / 4)));
+    }
+
+    function paint(tile: Tile) {
+      const face = faceValue(tile.value);
+      tile.el.textContent = String(face);
+      tile.el.dataset.value = tile.value >= 12 ? 'super' : String(tile.value);
+      tile.el.dataset.digits = String(String(face).length);
+      tile.el.style.zIndex = String(tile.value);
+    }
+
+    function createTile(cell: number, value: number, fresh: boolean): Tile {
+      const el = document.createElement('div');
+      el.className = 'tile';
+      const tile: Tile = { id: tileId++, value, cell, el };
+      place(tile);
+      paint(tile);
+      if (fresh) el.classList.add('tile-new');
+      tilesEl.appendChild(el);
+      byCell[cell] = tile;
+      return tile;
+    }
+
+    function clearTiles() {
+      tilesEl.replaceChildren();
+      byCell = new Array(16).fill(null);
+    }
+
+    function setAnimationDuration(ms: number) {
+      boardEl.style.setProperty('--move-dur', `${ms}ms`);
+      boardEl.classList.toggle('no-anim', ms === 0);
+    }
+
+    // ── Game lifecycle ───────────────────────────────────────
+    function newGame() {
+      flush();
+      clearTiles();
+      hideOverlay();
+
+      const start = newBoard();
+      board = start.board;
+      for (const s of start.spawns) createTile(s.cell, s.value, true);
+
+      score = 0;
+      moves = 0;
+      celebrated = false;
+      rateSamples = [];
+      games++;
+      render();
+    }
+
+    function render() {
+      $('[data-score]').textContent = String(score);
+      $('[data-best]').textContent = String(best);
+      $('[data-stat-games]').textContent = String(games);
+      $('[data-stat-wins]').textContent = String(wins);
+      $('[data-stat-moves]').textContent = String(moves);
+      $('[data-stat-maxtile]').textContent = maxTile(board)
+        ? String(faceValue(maxTile(board)))
+        : '—';
+      $('[data-stat-agent]').textContent = policy.name;
+
+      const rate = meanRate();
+      $('[data-stat-rate]').textContent = rate ? `${rate.toFixed(0)} moves/s` : '—';
+    }
+
+    function meanRate(): number | null {
+      if (rateSamples.length < 5) return null;
+      const mean = rateSamples.reduce((a, b) => a + b, 0) / rateSamples.length;
+      return mean > 0 ? 1000 / mean : null;
+    }
+
+    /**
+     * Apply one move: mutate the board, animate the tiles, spawn.
+     * Returns why the game stopped, or 'ok'.
+     */
+    function applyMove(dir: Dir): StepResult | 'illegal' {
+      flush();
+
+      const result = move(board, dir);
+      if (!result.moved) return 'illegal';
+
+      // Group arrivals by destination cell. A cell with two arrivals is
+      // a merge; the tile that travelled further survives and pops.
+      const arrivals = new Map<number, Tile[]>();
+      for (const slide of result.slides) {
+        const tile = byCell[slide.from];
+        if (!tile) continue;
+        const group = arrivals.get(slide.to);
+        if (group) group.push(tile);
+        else arrivals.set(slide.to, [tile]);
+      }
+
+      const nextByCell: Array<Tile | null> = new Array(16).fill(null);
+      const losers: Tile[] = [];
+      const merged: Tile[] = [];
+
+      for (const [to, group] of arrivals) {
+        for (const tile of group) {
+          tile.cell = to;
+          place(tile);
+        }
+
+        if (group.length === 2) {
+          const survivor = group[1];
+          const loser = group[0];
+          survivor.nextValue = survivor.value + 1;
+          survivor.el.style.zIndex = String(survivor.value + 20); // ride over the loser
+          losers.push(loser);
+          merged.push(survivor);
+          nextByCell[to] = survivor;
+        } else {
+          nextByCell[to] = group[0];
+        }
+      }
+
+      board = result.board;
+      score += result.reward;
+      moves++;
+      if (score > best) {
+        best = score;
+        writeBest(best);
+      }
+
+      // Always spawn, even on the winning move. Reaching 2048 stops the
+      // *agent*, but it isn't a terminal state in the game — a human
+      // gets to keep playing, so the board has to stay live.
+      const won = maxTile(board) >= WIN_EXPONENT;
+      const spawn = spawnTile(board);
+
+      // A commit can be reached two ways: its own timer firing, or a
+      // flush() forcing it early when the next move arrives. It must run
+      // exactly once. If it runs twice, the second pass reads a merged
+      // tile's already-consumed `nextValue` (now undefined) and paints
+      // faceValue(undefined) → "1" with no palette match, and re-creates
+      // the spawned tile. Those are the phantom "1"s and doubled tiles.
+      let committed = false;
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+
+        for (const tile of losers) tile.el.remove();
+
+        for (const tile of merged) {
+          tile.value = tile.nextValue!;
+          delete tile.nextValue;
+          paint(tile);
+          tile.el.classList.remove('tile-merged');
+          void tile.el.offsetWidth; // restart the pop even on back-to-back merges
+          tile.el.classList.add('tile-merged');
+        }
+
+        byCell = nextByCell;
+        if (spawn) createTile(spawn.cell, spawn.value, true);
+
+        if (import.meta.env.DEV) assertTilesMatchBoard();
+      };
+
+      const duration = currentDuration();
+      if (duration === 0) {
+        commit();
+      } else {
+        // Null the handle when the timer fires on its own, so a later
+        // flush() doesn't treat this finished commit as still pending.
+        const timer = window.setTimeout(() => {
+          pending = null;
+          commit();
+        }, duration);
+        pending = { timer, commit };
+      }
+
+      render();
+
+      if (won) return 'won';
+      if (isGameOver(board)) return 'gameover';
+      return 'ok';
+    }
+
+    /**
+     * The DOM tiles and the numeric board are two representations of one
+     * thing, reconciled by hand on every move. If they drift, tiles
+     * silently vanish or ghost — and it shows up hundreds of moves later
+     * with no clue where it started. Cheap to assert, miserable to debug.
+     * Stripped from production builds.
+     */
+    function assertTilesMatchBoard() {
+      for (let cell = 0; cell < 16; cell++) {
+        const tile = byCell[cell];
+        const value = board[cell];
+        if (value === 0 && tile) {
+          console.error(`2048: tile ${tile.id} sits on empty cell ${cell}`, { board, byCell });
+          return;
+        }
+        if (value !== 0 && !tile) {
+          console.error(`2048: cell ${cell} holds ${faceValue(value)} but has no tile`, {
+            board,
+            byCell,
+          });
+          return;
+        }
+        if (tile && tile.value !== value) {
+          console.error(
+            `2048: cell ${cell} is ${faceValue(value)} but tile ${tile.id} shows ${faceValue(tile.value)}`,
+            { board, byCell },
+          );
+          return;
+        }
+      }
+    }
+
+    /** Human moves animate at a fixed pace; the agent's scale with speed. */
+    function currentDuration(): number {
+      if (!runner.running) return 100;
+      return animationDuration(SPEEDS[Number(speedInput.value)].mps);
+    }
+
+    // ── Overlay ──────────────────────────────────────────────
+    function showOverlay(title: string, sub: string, tone: 'win' | 'lose') {
+      $('[data-overlay-title]').textContent = title;
+      $('[data-overlay-sub]').textContent = sub;
+      overlayEl.dataset.tone = tone;
+      overlayEl.hidden = false;
+    }
+
+    function hideOverlay() {
+      overlayEl.hidden = true;
+    }
+
+    // ── Agent ────────────────────────────────────────────────
+    const runner = new AgentRunner({
+      step: () => {
+        const now = performance.now();
+        if (lastMoveAt) {
+          rateSamples.push(now - lastMoveAt);
+          if (rateSamples.length > 60) rateSamples.shift();
+        }
+        lastMoveAt = now;
+
+        const decision = policy.select(board);
+        if (!decision) return 'gameover';
+
+        const result = applyMove(decision.dir);
+        return result === 'illegal' ? 'stuck' : result;
+      },
+
+      onStateChange: (running) => {
+        // The board carries the visual "AI has control" cue and, with it,
+        // the pointer-events lockout that keeps taps from fighting the
+        // agent. Keyboard input is gated separately, in the handler.
+        root.dataset.ai = String(running);
+        playBtn.setAttribute('aria-pressed', String(running));
+        playBtn.classList.toggle('is-playing', running);
+        $('[data-play-label]').textContent = running ? 'Stop' : 'Watch AI Play';
+        $('[data-hint]').textContent = running
+          ? 'The agent has the board — press Stop to play yourself again.'
+          : 'Arrow keys or WASD to move. Swipe on touch.';
+      },
+
+      onHalt: (reason) => {
+        // The agent only halts mid-run, so it was playing — keep it going
+        // through the restart. That's the "play until 2048, then again"
+        // loop the whole page is built around.
+        if (reason === 'won') {
+          wins++;
+          render();
+          showOverlay('2048', 'Target reached — new game', 'win');
+          // Let the win land before wiping the board. Even at Max speed
+          // this pause is the point: it's the only frame worth watching.
+          window.setTimeout(() => {
+            newGame();
+            runner.start();
+          }, 1400);
+          return;
+        }
+
+        showOverlay('No moves left', 'Restarting', 'lose');
+        window.setTimeout(() => {
+          newGame();
+          runner.start();
+        }, 1200);
+      },
+    });
+
+    // ── Controls ─────────────────────────────────────────────
+    playBtn.addEventListener('click', () => {
+      if (runner.running) {
+        runner.pause();
+        return;
+      }
+      // Handing off to the agent. Start it from a live board — if the
+      // human just lost, deal a fresh one first.
+      hideOverlay();
+      if (isGameOver(board)) newGame();
+      lastMoveAt = 0;
+      setAnimationDuration(currentDurationForSpeed());
+      runner.start();
+    });
+
+    // currentDuration() reads runner.running, which is still false at the
+    // instant we're about to start — so compute the agent duration directly.
+    function currentDurationForSpeed(): number {
+      return animationDuration(SPEEDS[Number(speedInput.value)].mps);
+    }
+
+    speedInput.addEventListener('input', () => {
+      const index = Number(speedInput.value);
+      runner.setSpeedIndex(index);
+      $('[data-speed-out]').textContent = SPEEDS[index].label;
+      if (runner.running) setAnimationDuration(animationDuration(SPEEDS[index].mps));
+      rateSamples = [];
+    });
+
+    $('[data-new]').addEventListener('click', () => {
+      runner.pause();
+      setAnimationDuration(100);
+      newGame();
+    });
+
+    // ── Human input ──────────────────────────────────────────
+    const KEYS: Record<string, Dir> = {
+      ArrowUp: D.Up,
+      ArrowRight: D.Right,
+      ArrowDown: D.Down,
+      ArrowLeft: D.Left,
+      w: D.Up,
+      d: D.Right,
+      s: D.Down,
+      a: D.Left,
+      k: D.Up,
+      l: D.Right,
+      j: D.Down,
+      h: D.Left,
+    };
+
+    function humanMove(dir: Dir) {
+      // The agent owns the board while it's running; ignore the human.
+      if (runner.running) return;
+
+      // A human move always animates at human speed, even right after the
+      // agent left the board at speed 0.
+      setAnimationDuration(100);
+
+      const result = applyMove(dir);
+
+      // Celebrate once, then get out of the way — the board is still
+      // playable and every subsequent move would re-trigger this.
+      if (result === 'won' && !celebrated) {
+        celebrated = true;
+        showOverlay('2048', 'You win — keep going', 'win');
+        window.setTimeout(hideOverlay, 1600);
+      }
+
+      if (result === 'gameover') showOverlay('No moves left', 'Press new game', 'lose');
+    }
+
+    window.addEventListener('keydown', (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const dir = KEYS[event.key];
+      if (dir === undefined) return;
+      event.preventDefault();
+      humanMove(dir);
+    });
+
+    // Swipe. 24px threshold keeps a sloppy tap from registering as a move.
+    let touchStart: { x: number; y: number } | null = null;
+
+    boardEl.addEventListener(
+      'touchstart',
+      (event) => {
+        const t = event.changedTouches[0];
+        touchStart = { x: t.clientX, y: t.clientY };
+      },
+      { passive: true },
+    );
+
+    boardEl.addEventListener('touchend', (event) => {
+      if (!touchStart) return;
+      const t = event.changedTouches[0];
+      const dx = t.clientX - touchStart.x;
+      const dy = t.clientY - touchStart.y;
+      touchStart = null;
+
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+      event.preventDefault();
+
+      if (Math.abs(dx) > Math.abs(dy)) humanMove(dx > 0 ? D.Right : D.Left);
+      else humanMove(dy > 0 ? D.Down : D.Up);
+    });
+
+    // ── Persistence ──────────────────────────────────────────
+    function readBest(): number {
+      try {
+        return Number(localStorage.getItem('2048-best') ?? 0) || 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    function writeBest(value: number) {
+      try {
+        localStorage.setItem('2048-best', String(value));
+      } catch {
+        /* private mode — best score just won't persist */
+      }
+    }
+
+    // ── Boot ─────────────────────────────────────────────────
+    setAnimationDuration(100);
+    newGame();
+    render();
+
+    // Swap the heuristic out for the trained network the moment it
+    // arrives. Nothing else needs to know it happened.
+    if (root.dataset.hasPolicy === 'true') {
+      loadNTuplePolicy().then((loaded) => {
+        if (!loaded) return;
+        policy = loaded.policy;
+        render();
+      });
+    }
+
+    window.addEventListener('pagehide', () => runner.destroy());
+  }
+</script>
+
+<!--
+  Tile rules live in a GLOBAL block on purpose. Astro scopes a
+  component's <style> by stamping a data-astro-cid attribute onto the
+  elements in its template and onto every selector. Tiles are created in
+  JavaScript, so they never get that attribute — a scoped `.tile` rule
+  would silently fail to match them and the tiles would render as
+  invisible zero-size divs. Everything under `.game ` here stays
+  namespaced, so nothing leaks to the rest of the site.
+-->
+<style is:global>
+  .game .tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc((100% - 3 * var(--gap)) / 4);
+    height: calc((100% - 3 * var(--gap)) / 4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    transform: translate(
+      calc(var(--col) * (100% + var(--gap))),
+      calc(var(--row) * (100% + var(--gap)))
+    );
+    transition: transform var(--move-dur) var(--ease);
+    /* No `will-change: transform`. Permanently promoting every tile to
+       its own compositing layer makes the GPU rasterize the text at
+       subpixel offsets, which reads as a faint blur. The slide is
+       GPU-accelerated without it. */
+    font-size: 9cqi;
+  }
+
+  /* Font steps down as digits pile up so 1024+ still fits the tile. */
+  .game .tile[data-digits='3'] {
+    font-size: 7.4cqi;
+  }
+  .game .tile[data-digits='4'] {
+    font-size: 5.8cqi;
+  }
+  .game .tile[data-digits='5'] {
+    font-size: 4.8cqi;
+  }
+
+  /* At Max speed there's nothing to see between frames, so every
+     transition and animation is switched off rather than left to
+     queue up behind moves that already happened. */
+  .game .board.no-anim .tile {
+    transition: none;
+    animation: none !important;
+  }
+
+  /* Sage ramp: low tiles recede into the board, high tiles saturate,
+     2048 breaks the palette entirely because it's the whole point. */
+  .game .tile[data-value='1'] {
+    background: #eef4ee;
+    color: var(--text-muted);
+  }
+  .game .tile[data-value='2'] {
+    background: #dfeee3;
+    color: var(--text-muted);
+  }
+  .game .tile[data-value='3'] {
+    background: var(--mint);
+    color: #1b3527;
+  }
+  .game .tile[data-value='4'] {
+    background: #93cfa8;
+    color: #143024;
+  }
+  .game .tile[data-value='5'] {
+    background: #6bbc8b;
+    color: #0f2b1e;
+  }
+  .game .tile[data-value='6'] {
+    background: #46a771;
+    color: #fff;
+  }
+  .game .tile[data-value='7'] {
+    background: var(--accent);
+    color: #fff;
+  }
+  .game .tile[data-value='8'] {
+    background: #2a6448;
+    color: #fff;
+  }
+  .game .tile[data-value='9'] {
+    background: #22543c;
+    color: #fff;
+  }
+  .game .tile[data-value='10'] {
+    background: #1a4530;
+    color: #fff;
+  }
+  .game .tile[data-value='11'] {
+    background: linear-gradient(145deg, #d8b53a, #b8912a);
+    color: #fff;
+    box-shadow:
+      0 0 0 1px rgba(184, 145, 42, 0.5),
+      0 6px 20px -4px rgba(184, 145, 42, 0.65);
+  }
+  .game .tile[data-value='super'] {
+    background: #12291d;
+    color: #fff;
+  }
+
+  /* scale/translate as separate properties means the pop can't clobber
+     the transform that positions the tile. */
+  .game .tile-new {
+    animation: g2048-pop-in 180ms var(--ease) both;
+  }
+  .game .tile-merged {
+    animation: g2048-pop 140ms var(--ease);
+  }
+
+  @keyframes g2048-pop-in {
+    from {
+      opacity: 0;
+      scale: 0.3;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+
+  /* Very subtle — a 3% breath on merge, not a bounce. */
+  @keyframes g2048-pop {
+    0% {
+      scale: 1;
+    }
+    40% {
+      scale: 1.03;
+    }
+    100% {
+      scale: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .game .tile {
+      transition: none;
+    }
+  }
+</style>
+
+<style>
+  .game {
+    /* MUST be an absolute length, never a percentage.
+       The tiles are positioned with `translate(col * (100% + gap))`, and
+       a percentage inside translate() resolves against the element's own
+       width — so a percentage gap would compute against one tile rather
+       than the board, and the tiles would drift out of register with the
+       grid cells under them. A clamped length keeps tile and cell
+       geometry identical at every viewport. */
+    --gap: clamp(7px, 2.6vw, 12px);
+    --board-max: 460px;
+    --move-dur: 100ms;
+
+    max-width: var(--board-max);
+    margin-top: 28px;
+  }
+
+  /* ── Scoreboard ───────────────────────────────────────── */
+  .scorebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    /* Wrap rather than overflow if a big score widens the boxes on a
+       narrow screen — New Game drops to its own line instead. */
+    flex-wrap: wrap;
+  }
+
+  .score-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 76px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .score-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+  }
+
+  .score-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+
+  /* ── Buttons ──────────────────────────────────────────── */
+  .btn {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition:
+      background 0.15s var(--ease),
+      border-color 0.15s var(--ease);
+  }
+
+  .btn:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+
+  .btn-play {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    min-width: 150px;
+  }
+
+  .btn-play:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .btn-play svg {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+  }
+
+  /* One button, two icons: whichever the state doesn't call for is
+     removed from the layout entirely so the label never shifts. */
+  .btn-play .icon-stop,
+  .btn-play.is-playing .icon-play {
+    display: none;
+  }
+
+  .btn-play.is-playing .icon-stop {
+    display: block;
+  }
+
+  /* When the agent is playing, the button reads as "active": a lighter
+     fill so Stop looks like the thing that ends an ongoing state. */
+  .btn-play.is-playing {
+    background: var(--accent-hover);
+  }
+
+  /* ── Controls row ─────────────────────────────────────── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .speed {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .speed-label {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+  }
+
+  .speed input {
+    width: 108px;
+    accent-color: var(--accent);
+  }
+
+  .speed output {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    min-width: 26px;
+  }
+
+  /* ── Board ────────────────────────────────────────────── */
+  .board-frame {
+    position: relative;
+  }
+
+  .board {
+    container-type: inline-size;
+    position: relative;
+    aspect-ratio: 1;
+    padding: var(--gap);
+    border-radius: var(--radius);
+    background: var(--border);
+    border: 1px solid var(--border-strong);
+    touch-action: none;
+    user-select: none;
+    transition: box-shadow 0.25s var(--ease);
+  }
+
+  .board:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* While the agent plays, ring the board and lock out taps so a stray
+     touch can't fight it. Keyboard is gated in JS to match. */
+  .game[data-ai='true'] .board {
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  .game[data-ai='true'] .tiles {
+    pointer-events: none;
+  }
+
+  .grid {
+    position: absolute;
+    inset: var(--gap);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: var(--gap);
+  }
+
+  .cell {
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg) 70%, var(--border));
+  }
+
+  .tiles {
+    position: absolute;
+    inset: var(--gap);
+  }
+
+  /* ── Overlay ──────────────────────────────────────────── */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    backdrop-filter: blur(2px);
+    animation: fade-in 220ms var(--ease) both;
+  }
+
+  /* `.overlay { display: flex }` is an author style, so it overrides the
+     browser's `[hidden] { display: none }` — which left this translucent,
+     blurred panel painted over the board at all times (the "gray mask").
+     Re-assert the hide with matching specificity. */
+  .overlay[hidden] {
+    display: none;
+  }
+
+  .overlay-title {
+    font-size: 2.75rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .overlay[data-tone='win'] .overlay-title {
+    color: #b8912a;
+  }
+
+  .overlay[data-tone='lose'] .overlay-title {
+    color: var(--text-muted);
+    font-size: 1.75rem;
+  }
+
+  .overlay-sub {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* ── Stats ────────────────────────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 8px;
+    margin-top: 18px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .stats dt {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-faint);
+  }
+
+  .stats dd {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Sits just under the board, close to its bottom edge, so it reads as
+     a caption on the board rather than a separate line of UI. */
+  .hint {
+    margin-top: 7px;
+    font-size: 0.75rem;
+    color: var(--text-faint);
+  }
+
+  /* ── Phones ───────────────────────────────────────────── */
+  @media (max-width: 460px) {
+    .game {
+      margin-top: 20px;
+    }
+
+    /* Score group and New Game each take a full half-row and split the
+       width, so they stay aligned and never crowd. */
+    .scorebar {
+      gap: 10px;
+    }
+
+    .score-group {
+      flex: 1 1 auto;
+    }
+
+    .score {
+      flex: 1;
+      min-width: 0;
+      padding: 5px 10px;
+    }
+
+    /* Bigger tap targets, and let the play button and slider each own a
+       full row: a wide "Watch AI Play", then a full-width speed slider. */
+    .btn {
+      padding: 10px 14px;
+    }
+
+    .controls {
+      gap: 12px;
+    }
+
+    .btn-play {
+      min-width: 0;
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+
+    .speed {
+      flex: 1 1 100%;
+    }
+
+    .speed input {
+      flex: 1;
+      width: auto;
+    }
+
+    .stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hint {
+      font-size: 0.75rem;
+    }
+  }
+
+  /* Very small phones (≤340px): drop New Game below the scores. */
+  @media (max-width: 340px) {
+    .score-group {
+      flex-basis: 100%;
+    }
+
+    .btn-ghost {
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .board {
+      transition: none;
+    }
+  }
+</style>

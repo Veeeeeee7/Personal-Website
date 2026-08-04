@@ -232,6 +232,13 @@ a:hover {
   fill: currentColor;
 }
 
+/* A 4-character wordmark won't fit the 40px square, so this variant
+   keeps the height and lets the width follow the text. */
+.wide-pill {
+  width: auto;
+  padding-inline: 12px;
+}
+
 /* Wordmark instead of a glyph. Sized to the icons' 18px optical box:
    caps at 13px read the same weight as the icon strokes beside them. */
 .cv-mark {

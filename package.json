@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "verify:engine": "node --experimental-strip-types --no-warnings rl/verify_engine.mjs",
+    "verify:policy": "node --experimental-strip-types --no-warnings rl/verify_policy.mjs"
   },
   "dependencies": {
     "astro": "^4.16.18"

@@ -1,0 +1,79 @@
+---
+import Base from '../layouts/Base.astro';
+import Game2048 from '../components/Game2048.astro';
+---
+
+<Base
+  title="2048"
+  description="Play 2048, or hand the board to a reinforcement learning agent trained to reach the 2048 tile."
+>
+  <a class="back" href="/">&larr; Back</a>
+
+  <header class="hero">
+    <h1>2048</h1>
+    <p class="tagline">
+      The classic game, plus an agent that plays it. Use the arrow keys yourself, or press
+      <strong>Watch AI Play</strong>. The agent takes over from whatever position is on the board
+      and runs until it reaches 2048, then starts over. Press it again to take back the board.
+    </p>
+  </header>
+
+  <Game2048 />
+
+  <section class="notes">
+    <h2>How the agent works</h2>
+
+    <p>
+      The agent is an n-tuple network: a linear value function over small
+      patterns of adjacent cells. Each tuple looks at a handful of cells and reads a learned weight
+      out of a table. The value of a position is the sum of those lookups. Every tuple is evaluated
+      under all eight symmetries of the board and shares one weight table, so a pattern learned in
+      one corner is known in all of them.
+    </p>
+
+    <p>
+      Training is TD(0) over afterstates, the position after the slide and merge but before
+      the random tile lands. That's the trick that makes the whole thing work. The agent never has to
+      average over where the next tile might appear, because it's evaluating a deterministic
+      consequence of its own move. Picking a move is then just: try all four, take the one with the
+      best immediate reward plus learned afterstate value.
+    </p>
+
+    <p>
+      The result is a policy that's a lookup table, not a neural network. This is why it ships to
+      this page as a few megabytes of quantized integers with no ML runtime involved.
+    </p>
+  </section>
+</Base>
+
+<style>
+  .notes {
+    margin-top: 56px;
+    max-width: var(--measure);
+  }
+
+  .notes h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .notes p {
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    text-wrap: pretty;
+  }
+
+  .notes strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .fallback-note {
+    font-size: 0.875rem;
+    padding-left: 14px;
+    border-left: 2px solid var(--border-strong);
+    color: var(--text-faint) !important;
+  }
+</style>
