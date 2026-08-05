@@ -6,7 +6,10 @@
 export const site = {
     name: "Victor Li",
     url: "https://victor-li.me",
-    email: "hello@victor-li.me",
+    // Real address — used to build mailto: links, never printed as text.
+    email: "victorli1076@gmail.com",
+    // What visitors actually see, obfuscated so scrapers don't harvest it.
+    emailDisplay: "victorli1076 at gmail.com",
 
     github: "https://github.com/Veeeeeee7",
     linkedin: "https://www.linkedin.com/in/victor-li-85b56027b",

@@ -5,6 +5,20 @@ import TabNav from '../components/TabNav.astro';
 import { site, facts, avatar } from '../data/site';
 import { highlights } from '../data/highlights';
 import { activity } from '../data/activity';
+
+// Masonry without JS: deal the cards round-robin into two columns, so card 1
+// and card 2 sit side by side, 3 and 4 below them, and so on. Each column is a
+// flex stack, so cards hug their own text instead of padding out to match a
+// neighbour, and the columns are free to end at different heights.
+//
+// Reading order is the catch — the DOM is now [1,3,5,2,4,6]. Every card carries
+// its true index as a CSS `order`, which does nothing while the columns are
+// laid out, but restores the real sequence when the columns collapse to one on
+// narrow screens (see `display: contents` in the stylesheet).
+const COLUMN_COUNT = 2;
+const columns = Array.from({ length: COLUMN_COUNT }, (_, col) =>
+  highlights.map((h, i) => ({ ...h, order: i })).filter((_, i) => i % COLUMN_COUNT === col),
+);
 ---
 
 <Base>
@@ -37,15 +51,24 @@ import { activity } from '../data/activity';
   <section class="panel" id="panel-highlights" role="tabpanel" aria-labelledby="tab-highlights">
     <div class="cards">
       {
-        highlights.map((h) => (
-          <a class="card" href={h.href} target="_blank" rel="noopener">
-            <div class="card-head">
-              <h3>{h.title}</h3>
-              <span class="meta">{h.meta}</span>
-            </div>
-            <p class="authors">{h.authors}</p>
-            <p>{h.blurb}</p>
-          </a>
+        columns.map((column) => (
+          <div class="cards-col">
+            {column.map((h) => {
+              // Unpublished work has no DOI yet, so it renders as a plain card.
+              const Tag = h.href ? 'a' : 'div';
+              const linkAttrs = h.href ? { href: h.href, target: '_blank', rel: 'noopener' } : {};
+              return (
+                <Tag class="card" style={`order:${h.order}`} {...linkAttrs}>
+                  <div class="card-head">
+                    <h3>{h.title}</h3>
+                    <span class="meta">{h.meta}</span>
+                  </div>
+                  <p class="authors">{h.authors}</p>
+                  <p>{h.blurb}</p>
+                </Tag>
+              );
+            })}
+          </div>
         ))
       }
     </div>

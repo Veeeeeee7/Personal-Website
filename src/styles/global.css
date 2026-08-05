@@ -343,11 +343,35 @@ a:hover {
 
 /* ── Highlight cards ──────────────────────────────────────── */
 /* One column when narrow, two once there's room for two readable cards. */
+/* Two independent columns, each a tight vertical stack. Cards size to their own
+   text rather than stretching to match a neighbour, and a short card doesn't
+   leave a hole under it — the next card in that column just moves up. */
 .cards {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+}
+
+.cards-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* One column below two readable widths. `display: contents` dissolves the column
+   wrappers so every card becomes a direct flex child here, and the per-card
+   `order` set in index.astro puts them back into true reading sequence. */
+@media (max-width: 660px) {
+  .cards {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cards-col {
+    display: contents;
+  }
 }
 
 .card {
@@ -364,11 +388,18 @@ a:hover {
     box-shadow 0.2s var(--ease);
 }
 
-a.card:hover {
+/* Every card lifts on hover, linked or not, so the under-review ones don't read
+   as disabled. Only the <a> cards actually go anywhere — the <div> cards keep a
+   default cursor so the lift stays decorative and doesn't promise a click. */
+.card:hover {
   border-color: var(--mint);
   transform: translateY(-2px);
   box-shadow: 0 6px 24px -12px rgba(47, 111, 78, 0.4);
   color: inherit;
+}
+
+div.card {
+  cursor: default;
 }
 
 .card-head {
@@ -401,6 +432,13 @@ a.card:hover {
   padding: 2px 9px;
   border-radius: 999px;
   letter-spacing: 0;
+}
+
+/* Cards without a link are unpublished — mute the pill so it doesn't read as a venue. */
+div.card .meta {
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid var(--border-strong);
 }
 
 .card p {

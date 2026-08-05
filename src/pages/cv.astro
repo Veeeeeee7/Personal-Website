@@ -3,6 +3,13 @@ import Base from '../layouts/Base.astro';
 import { site } from '../data/site';
 import { highlights } from '../data/highlights';
 
+// The home page leads with unpublished work; a CV conventionally lists
+// peer-reviewed first, so flip the order here.
+const publications = [
+  ...highlights.filter((p) => p.href),
+  ...highlights.filter((p) => !p.href),
+];
+
 const education = [
   {
     role: 'B.S. Mathematics and Computer Science',
@@ -14,13 +21,22 @@ const education = [
 
 const experience = [
   {
+    role: 'Type 1 Diabetes Digital-Twin Benchmark',
+    org: 'TAIL Lab, Emory University',
+    when: 'Apr 2026 — Present',
+    bullets: [
+      'Building a benchmark that evaluates digital-twin models of Type 1 diabetes patients by decision transfer: whether a fitted twin ranks candidate insulin therapies as the true patient would, rather than by trajectory fidelity alone.',
+      'Implementing and comparing per-instance Bayesian (MCMC) and simulation-based inference (neural posterior estimation) twins against neural-regressor baselines, scored using the UVA/Padova (simglucose) simulator as ground truth.',
+    ],
+  },
+  {
     role: 'Elk Preservation Application',
     org: 'Emory Department of Computer Science',
-    when: 'Jan 2026 — Present',
+    when: 'Jan 2026 — May 2026',
     bullets: [
-      'Architected and deployed the backend for a PERC wildlife webapp supporting elk conservation, with a PostgreSQL database for image metadata and cloud object storage for image assets (GCloud Run, Scheduler, Secrets, SQL, Storage).',
+      'Architected and deployed the backend for a PERC wildlife web app supporting elk conservation, with a PostgreSQL database for image metadata and cloud object storage for image assets (Google Cloud Run, Scheduler, Secret Manager, Cloud SQL, Storage).',
       'Integrated a Firebase-hosted React application with the backend API, enabling ranchers to upload wildlife photos.',
-      'Fine-tuning a ViT classification model on pretrained YOLOv9 object detection to estimate elk counts from images, supporting fair compensation for elk-related land damages.',
+      'Fine-tuned a ViT classification model leveraging pretrained YOLOv9 object detection to estimate elk counts from images, supporting fair compensation for elk-related land damages by environmental agencies.',
     ],
   },
   {
@@ -28,26 +44,29 @@ const experience = [
     org: 'Center for Data Science, Emory Nell Hodgson Woodruff School of Nursing',
     when: 'Oct 2025 — Present',
     bullets: [
-      'Developed and cleaned a new AI/ML benchmark dataset of child care quality ratings, scraped via Playwright from the Georgia Department of Early Care and Learning.',
-      'Developing a causal discovery graph via FPM and PC alongside a DiCE counterfactual framework to prune, identify, and rank key determinants of high-quality child care across 245 provider attributes.',
+      'Built and cleaned a new LLM-curated AI/ML benchmark dataset of child care quality and provider compliance ratings spanning 12 U.S. states.',
+      'Designed a within-state and cross-state (leave-one-state-out) transfer benchmark of child care quality ratings, evaluating pretrained language models (MBERT with CORN ordinal heads), LLMs (Qwen3-4B with classification heads, RAG, and LoRA fine-tuning), TabNet/TabPFN/AutoGluon, and classical baselines by weighted accuracy and quadratic weighted kappa.',
+      'Developed a causal-discovery graph (FPM + PC) and a counterfactual framework (DiCE) to prune, identify, and rank key determinants of high-quality child care across 245 provider attributes on the Georgia subset.',
     ],
   },
   {
     role: 'Healthcare Reinforcement Learning Research',
-    org: 'TAIL Lab, Emory Department of Computer Science',
+    org: 'TAIL Lab, Emory University',
     when: 'Oct 2025 — Feb 2026',
     bullets: [
       'Conducted an empirical study on the consistency of Set-Valued Policies and Dead-End Discovery frameworks for clinician-in-the-loop treatment recommendation.',
-      'Designed and evaluated a partial ordering of recommended actions giving clinicians actionable recommendations for sepsis patients, evaluated on MIMIC-III.',
+      'Designed a partial ordering over recommended actions that gives clinicians actionable treatment recommendations for sepsis patients, evaluated on the LifeGate environment and MIMIC-III dataset.',
     ],
   },
   {
-    role: 'Summer Oxford Research Scholars',
-    org: 'Math & CS Department, Oxford College of Emory University',
+    role: 'Sparse Mobile Crowd Sensing',
+    org: 'Summer Oxford Research Scholars, Oxford College of Emory University',
     when: 'May 2025 — Aug 2025',
     bullets: [
-      'Developed a Learned Gumbel-Noise Active Sparse Mobile Crowd Sensing framework in PyTorch using a Time Series Transformer and a custom active sensor selection layer, reducing reconstruction error of missing sensor data by up to 28% against traditional Time Series Transformers.',
-      "Published and presented a first-authored paper and poster at IPCCC '25.",
+      'Developed a Learned Gumbel-Based Active Sparse Mobile Crowd Sensing framework in PyTorch using a Time Series Transformer with a novel active sensor-selection layer that samples Gumbel noise from learnable weights, reducing reconstruction error of missing sensor data by up to 28%.',
+      'Extended the framework with a patched forecasting variant that convolutionally divides each sensing cycle into patches and gives every patch its own selector layer, testing whether intra-cycle temporal structure (e.g. morning, afternoon, night) yields better sensor selection.',
+      'Benchmarked both models on the Urban Air (437 stations, hourly) and SensorScope St-Bernard (31 sensors, two-minute) datasets; found the patched variant improves only in isolated settings, attributed to lost cross-patch communication.',
+      "Published and presented a first-author full paper and a follow-up extended abstract at IPCCC '25.",
     ],
   },
   {
@@ -55,10 +74,32 @@ const experience = [
     org: 'Center for Data Science, Emory Nell Hodgson Woodruff School of Nursing',
     when: 'Nov 2024 — Oct 2025',
     bullets: [
-      'Developed an ensemble learning framework via AutoGluon, ECG-FM, FFT, and Wavelet Transform for classification of 12-lead electrocardiograms.',
-      'Placed 39th in the 2025 George B. Moody PhysioNet Challenge.',
-      "Published and presented a first-authored paper at CinC '25.",
+      'Developed an ensemble learning framework via AutoGluon, ECG-FM, FFT, and Wavelet Transform with early fusion for Chagas disease detection from 12-lead electrocardiograms.',
+      'Competed as team GAIN-ECG and placed 39th in the 2025 George B. Moody PhysioNet Challenge.',
+      "Published and presented a first-author paper at CinC '25.",
     ],
+  },
+  {
+    role: 'Fairness in Recommender Systems',
+    org: 'Independent Research · Los Angeles, CA',
+    when: 'Sep 2022 — Feb 2023',
+    bullets: [
+      'Reduced item under-recommendation bias while cutting training costs in Debiased Bayesian Personalized Ranking by replacing an adversarial debiasing network with an autoencoder plus ranking post-processing.',
+      "Published as a co-author at ISCAIS '23.",
+    ],
+  },
+];
+
+const skills = [
+  { label: 'Languages', items: 'Python, Java, JavaScript, C, MATLAB, SQL' },
+  {
+    label: 'ML',
+    items:
+      'PyTorch, NumPy, Pandas, SciPy, scikit-learn, Hugging Face Transformers, PEFT/LoRA, AutoGluon, TabNet, TabPFN',
+  },
+  {
+    label: 'Tools',
+    items: 'Git, SLURM, Google Cloud (Run, Cloud SQL, Storage), Firebase, PostgreSQL, React, Playwright',
   },
 ];
 ---
@@ -69,7 +110,7 @@ const experience = [
   <header class="hero">
     <h1>Curriculum Vitae</h1>
     <p class="tagline">
-      Victor Li · Atlanta, GA · <a href={`mailto:${site.email}`}>{site.email}</a>
+      Victor Li · Atlanta, GA · <a href={`mailto:${site.email}`}>{site.emailDisplay}</a>
     </p>
   </header>
 
@@ -91,12 +132,17 @@ const experience = [
     <section>
       <h2>Publications</h2>
       {
-        highlights.map((p) => (
+        publications.map((p) => (
           <div class="entry">
             <h3>
-              <a href={p.href} target="_blank" rel="noopener">
-                {p.title}
-              </a>
+              {/* Unpublished work has no DOI to point at yet. */}
+              {p.href ? (
+                <a href={p.href} target="_blank" rel="noopener">
+                  {p.title}
+                </a>
+              ) : (
+                p.title
+              )}
             </h3>
             <span class="when">{p.meta}</span>
             <span class="where">{p.authors}</span>
@@ -118,6 +164,18 @@ const experience = [
                 <li>{b}</li>
               ))}
             </ul>
+          </div>
+        ))
+      }
+    </section>
+
+    <section>
+      <h2>Technical Skills</h2>
+      {
+        skills.map((s) => (
+          <div class="entry">
+            <h3>{s.label}</h3>
+            <p>{s.items}</p>
           </div>
         ))
       }
