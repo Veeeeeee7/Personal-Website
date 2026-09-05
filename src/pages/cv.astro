@@ -25,8 +25,19 @@ const experience = [
     org: 'TAIL Lab, Emory University',
     when: 'Apr 2026 — Present',
     bullets: [
-      'Building a benchmark that evaluates digital-twin models of Type 1 diabetes patients by decision transfer: whether a fitted twin ranks candidate insulin therapies as the true patient would, rather than by trajectory fidelity alone.',
-      'Implementing and comparing per-instance Bayesian (MCMC) and simulation-based inference (neural posterior estimation) twins against neural-regressor baselines, scored using the UVA/Padova (simglucose) simulator as ground truth.',
+      'Proposed an evaluation protocol that scores a Type 1 diabetes digital twin by decision quality — whether its predicted glucose trajectories rank candidate insulin treatments as the real patient would (Spearman correlation, regret) — rather than by trajectory prediction accuracy (RMSE, MARD) alone.',
+      'Built the benchmark on 30 UVA/Padova (simglucose) virtual patients under 21 basal-bolus treatments, comparing MCMC, simulation-based inference, and Kalman filter twins with linear, neural, and prior baselines.',
+      'Found empirical evidence that the two criteria disagree: a population-prior twin with the worst RMSE (63.6 mg/dL) ranked treatments second best (0.766 Spearman), while a neural twin with half the RMSE (32.9 mg/dL) ranked at chance (0.049), verified with Friedman and Holm-corrected Wilcoxon tests; first-author paper under review.',
+    ],
+  },
+  {
+    role: 'Child Care Quality (CCQ) Dataset',
+    org: 'Center for Data Science, Emory Nell Hodgson Woodruff School of Nursing',
+    when: 'Oct 2025 — Present',
+    bullets: [
+      'Built CCQ, a de-identified dataset of 64,479 child care providers (29,152 rated) across 12 U.S. states, collected from state QRIS portals and released as row-aligned text and preprocessed tabular versions on Hugging Face; first-author paper under review.',
+      'Implemented an LLM-based curation pipeline that adapts a hand-built Georgia reference to anonymize and clean the other states with open-source Qwen3 agents, verified against expert-curated ground truth.',
+      'Designed within-state and leave-one-state-out benchmarks over tabular models (LR, RF, XGBoost, TabNN, TabPFN) and language models (ModernBERT; Qwen3-4B with classification head, RAG, LoRA), scored by balanced accuracy, quadratic weighted kappa, and Elo; tree models won within-state, zero-shot transfer was near chance, and modest target-state supervision recovered most within-state performance.',
     ],
   },
   {
@@ -34,19 +45,8 @@ const experience = [
     org: 'Emory Department of Computer Science',
     when: 'Jan 2026 — May 2026',
     bullets: [
-      'Architected and deployed the backend for a PERC wildlife web app supporting elk conservation, with a PostgreSQL database for image metadata and cloud object storage for image assets (Google Cloud Run, Scheduler, Secret Manager, Cloud SQL, Storage).',
-      'Integrated a Firebase-hosted React application with the backend API, enabling ranchers to upload wildlife photos.',
+      'Architected and deployed the backend for a PERC elk-conservation web app: a PostgreSQL image-metadata database and cloud object storage (Google Cloud Run, Scheduler, Secret Manager, Cloud SQL, Storage), integrated with a Firebase-hosted React frontend for rancher wildlife-photo uploads.',
       'Fine-tuned a ViT classification model leveraging pretrained YOLOv9 object detection to estimate elk counts from images, supporting fair compensation for elk-related land damages by environmental agencies.',
-    ],
-  },
-  {
-    role: 'Child Care Quality Dataset',
-    org: 'Center for Data Science, Emory Nell Hodgson Woodruff School of Nursing',
-    when: 'Oct 2025 — Present',
-    bullets: [
-      'Built and cleaned a new LLM-curated AI/ML benchmark dataset of child care quality and provider compliance ratings spanning 12 U.S. states.',
-      'Designed a within-state and cross-state (leave-one-state-out) transfer benchmark of child care quality ratings, evaluating pretrained language models (MBERT with CORN ordinal heads), LLMs (Qwen3-4B with classification heads, RAG, and LoRA fine-tuning), TabNet/TabPFN/AutoGluon, and classical baselines by weighted accuracy and quadratic weighted kappa.',
-      'Developed a causal-discovery graph (FPM + PC) and a counterfactual framework (DiCE) to prune, identify, and rank key determinants of high-quality child care across 245 provider attributes on the Georgia subset.',
     ],
   },
   {
@@ -54,7 +54,7 @@ const experience = [
     org: 'TAIL Lab, Emory University',
     when: 'Oct 2025 — Feb 2026',
     bullets: [
-      'Conducted an empirical study on the consistency of Set-Valued Policies and Dead-End Discovery frameworks for clinician-in-the-loop treatment recommendation.',
+      'Conducted an empirical study on the consistency of Set-Valued Policies and Dead-End Discovery frameworks for clinician-in-the-loop sepsis treatment on MIMIC-III.',
       'Designed a partial ordering over recommended actions that gives clinicians actionable treatment recommendations for sepsis patients, evaluated on the LifeGate environment and MIMIC-III dataset.',
     ],
   },
@@ -91,11 +91,11 @@ const experience = [
 ];
 
 const skills = [
-  { label: 'Languages', items: 'Python, Java, JavaScript, C, MATLAB, SQL' },
+  { label: 'Languages', items: 'Python, Java, C, MATLAB, SQL' },
   {
     label: 'ML',
     items:
-      'PyTorch, NumPy, Pandas, SciPy, scikit-learn, Hugging Face Transformers, PEFT/LoRA, AutoGluon, TabNet, TabPFN',
+      'PyTorch, NumPy, Pandas, SciPy, scikit-learn, XGBoost, Hugging Face Transformers, PEFT/LoRA, AutoGluon, TabNet, TabPFN, SHAP',
   },
   {
     label: 'Tools',

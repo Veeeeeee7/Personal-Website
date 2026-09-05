@@ -13,17 +13,31 @@ export type Highlight = {
 // Titles, author lists, and DOIs verified against Crossref.
 export const highlights: Highlight[] = [
     {
+        title: "Evaluating Digital Twins for Type 1 Diabetes by Decision Quality",
+        authors:
+            "Victor Li, Owen Tucker, Michael S. Hughes, Temiloluwa Prioleau, Shengpu Tang",
+        meta: "Under review",
+        blurb: "An evaluation protocol that scores a Type 1 diabetes digital twin by whether its glucose trajectories rank candidate insulin treatments as the real patient would, not by trajectory error alone. On 30 UVA/Padova virtual patients under 21 treatments, the two criteria disagree: the worst-RMSE twin ranks second best, and a twin with half the RMSE ranks at chance.",
+    },
+    {
+        title: "CCQ: A Multi-State Child Care Quality Dataset to Support AI for Children’s Health Research",
+        authors:
+            "Victor Li, Yuzhang Xie, Ziwei Dong, Wenjing Ma, Carl Yang, Jinbing Bai, Huiwen Xu, Jiaying Lu",
+        meta: "Under review",
+        blurb: "A de-identified dataset of 64,479 child care providers across 12 U.S. states, curated from state QRIS portals by an LLM pipeline and released on Hugging Face, with within-state and leave-one-state-out benchmarks over tabular models and language models.",
+    },
+    {
+        title: "Physiological Identifiability of Type 1 Diabetes Digital Twins Under Behavioral Heterogeneity",
+        authors:
+            "Owen Tucker, Victor Li, Michael S. Hughes, Temiloluwa Prioleau, Shengpu Tang",
+        meta: "Under review",
+        blurb: "A study of when the physiological parameters of a Type 1 diabetes digital twin can actually be recovered from observed data, and how behavioral variation across patients limits that identifiability.",
+    },
+    {
         title: "Reconciling Set-Valued Policy & Dead-End Discovery in Healthcare Reinforcement Learning: An Empirical Analysis",
         authors: "Victor Li, Sixing Wu, Shengpu Tang",
         meta: "Under review",
         blurb: "An empirical study of how consistently Set-Valued Policies and Dead-End Discovery agree on clinician-in-the-loop sepsis treatment, plus a partial ordering over recommended actions. Evaluated on LifeGate and MIMIC-III.",
-    },
-    {
-        title: "CCQ: An LLM-Curated Child Care Quality Dataset to Support AI Research for Children’s Health",
-        authors:
-            "Victor Li, Yuzhang Xie, Qingyang Zhu, Wenjing Ma, Xiao Hu, Carl Yang, Jinbing Bai, Huiwen Xu, Jiaying Lu",
-        meta: "Under review",
-        blurb: "An LLM-curated benchmark of child care quality and provider compliance ratings across 12 U.S. states, with within-state and leave-one-state-out transfer tasks over language models, LLMs, and tabular baselines.",
     },
     {
         title: "Gumbel-Based Active Sparse Mobile Crowd Sensing with Time Series Transformer",
