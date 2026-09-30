@@ -16,8 +16,9 @@ import { activity } from '../data/activity';
 // laid out, but restores the real sequence when the columns collapse to one on
 // narrow screens (see `display: contents` in the stylesheet).
 const COLUMN_COUNT = 2;
+const featured = highlights.filter((h) => h.showOnHome !== false);
 const columns = Array.from({ length: COLUMN_COUNT }, (_, col) =>
-  highlights.map((h, i) => ({ ...h, order: i })).filter((_, i) => i % COLUMN_COUNT === col),
+  featured.map((h, i) => ({ ...h, order: i })).filter((_, i) => i % COLUMN_COUNT === col),
 );
 ---
 
@@ -54,14 +55,14 @@ const columns = Array.from({ length: COLUMN_COUNT }, (_, col) =>
         columns.map((column) => (
           <div class="cards-col">
             {column.map((h) => {
-              // Unpublished work has no DOI yet, so it renders as a plain card.
+              // Nothing to link yet (unpublished, or proceedings not out) → plain card.
               const Tag = h.href ? 'a' : 'div';
               const linkAttrs = h.href ? { href: h.href, target: '_blank', rel: 'noopener' } : {};
               return (
                 <Tag class="card" style={`order:${h.order}`} {...linkAttrs}>
                   <div class="card-head">
                     <h3>{h.title}</h3>
-                    <span class="meta">{h.meta}</span>
+                    <span class:list={['meta', { pending: h.status !== 'published' }]}>{h.meta}</span>
                   </div>
                   <p class="authors">{h.authors}</p>
                   <p>{h.blurb}</p>

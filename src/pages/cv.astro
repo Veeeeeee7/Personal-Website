@@ -4,11 +4,11 @@ import { site } from '../data/site';
 import { highlights } from '../data/highlights';
 
 // The home page leads with unpublished work; a CV conventionally lists
-// peer-reviewed first, so flip the order here.
-const publications = [
-  ...highlights.filter((p) => p.href),
-  ...highlights.filter((p) => !p.href),
-];
+// peer-reviewed first, then preprints, then under review.
+const statusOrder = ['published', 'preprint', 'review'] as const;
+const publications = statusOrder.flatMap((status) =>
+  highlights.filter((p) => p.status === status),
+);
 
 const education = [
   {
@@ -27,7 +27,7 @@ const experience = [
     bullets: [
       'Proposed an evaluation protocol that scores a Type 1 diabetes digital twin by decision quality — whether its predicted glucose trajectories rank candidate insulin treatments as the real patient would (Spearman correlation, regret) — rather than by trajectory prediction accuracy (RMSE, MARD) alone.',
       'Built the benchmark on 30 UVA/Padova (simglucose) virtual patients under 21 basal-bolus treatments, comparing MCMC, simulation-based inference, and Kalman filter twins with linear, neural, and prior baselines.',
-      'Found empirical evidence that the two criteria disagree: a population-prior twin with the worst RMSE (63.6 mg/dL) ranked treatments second best (0.766 Spearman), while a neural twin with half the RMSE (32.9 mg/dL) ranked at chance (0.049), verified with Friedman and Holm-corrected Wilcoxon tests; first-author paper under review.',
+      'Showed the two disagree: a population-prior twin with the worst RMSE (63.6 mg/dL) ranked treatments second best (0.766 Spearman), while a neural twin with half the RMSE (32.9 mg/dL) ranked at chance (0.049), verified with Friedman and Holm-corrected Wilcoxon tests; first-author manuscript under review.',
     ],
   },
   {
@@ -35,9 +35,10 @@ const experience = [
     org: 'Center for Data Science, Emory Nell Hodgson Woodruff School of Nursing',
     when: 'Oct 2025 — Present',
     bullets: [
-      'Built CCQ, a de-identified dataset of 64,479 child care providers (29,152 rated) across 12 U.S. states, collected from state QRIS portals and released as row-aligned text and preprocessed tabular versions on Hugging Face; first-author paper under review.',
-      'Implemented an LLM-based curation pipeline that adapts a hand-built Georgia reference to anonymize and clean the other states with open-source Qwen3 agents, verified against expert-curated ground truth.',
+      'Built CCQ, a de-identified dataset of 64,479 child care providers (29,152 quality-rated) across 12 U.S. states, collected from state QRIS portals and released as row-aligned text and preprocessed tabular versions on Hugging Face; first-author manuscript under review.',
+      'Developed an LLM-based curation pipeline that adapts a hand-built Georgia reference to anonymize and clean the other states with open-source Qwen3 agents, verified against expert-curated ground truth.',
       'Designed within-state and leave-one-state-out benchmarks over tabular models (LR, RF, XGBoost, TabNN, TabPFN) and language models (ModernBERT; Qwen3-4B with classification head, RAG, LoRA), scored by balanced accuracy, quadratic weighted kappa, and Elo; tree models won within-state, zero-shot transfer was near chance, and modest target-state supervision recovered most within-state performance.',
+      'Developed a causal-discovery graph (FPM + PC) and a counterfactual framework (DiCE) to prune, identify, and rank key determinants of high-quality child care in Georgia across 245 provider attributes.',
     ],
   },
   {
@@ -54,8 +55,8 @@ const experience = [
     org: 'TAIL Lab, Emory University',
     when: 'Oct 2025 — Feb 2026',
     bullets: [
-      'Conducted an empirical study on the consistency of Set-Valued Policies and Dead-End Discovery frameworks for clinician-in-the-loop sepsis treatment on MIMIC-III.',
-      'Designed a partial ordering over recommended actions that gives clinicians actionable treatment recommendations for sepsis patients, evaluated on the LifeGate environment and MIMIC-III dataset.',
+      'Conducted an empirical study on the consistency of Set-Valued Policies and Dead-End Discovery frameworks for clinician-in-the-loop sepsis treatment on MIMIC-III, and designed a partial ordering over recommended actions that gives clinicians actionable treatment recommendations.',
+      "First-author paper accepted to the Pacific Symposium on Biocomputing (PSB '27) for publication in the proceedings and a poster presentation.",
     ],
   },
   {
@@ -63,10 +64,10 @@ const experience = [
     org: 'Summer Oxford Research Scholars, Oxford College of Emory University',
     when: 'May 2025 — Aug 2025',
     bullets: [
-      'Developed a Learned Gumbel-Based Active Sparse Mobile Crowd Sensing framework in PyTorch using a Time Series Transformer with a novel active sensor-selection layer that samples Gumbel noise from learnable weights, reducing reconstruction error of missing sensor data by up to 28%.',
-      'Extended the framework with a patched forecasting variant that convolutionally divides each sensing cycle into patches and gives every patch its own selector layer, testing whether intra-cycle temporal structure (e.g. morning, afternoon, night) yields better sensor selection.',
-      'Benchmarked both models on the Urban Air (437 stations, hourly) and SensorScope St-Bernard (31 sensors, two-minute) datasets; found the patched variant improves only in isolated settings, attributed to lost cross-patch communication.',
-      "Published and presented a first-author full paper and a follow-up extended abstract at IPCCC '25.",
+      'Developed a Learned Gumbel-Based Active Sparse Mobile Crowd Sensing framework: an encoder–decoder Time Series Transformer plus a custom sensor-selection layer that samples Gumbel noise from learnable weights, reducing reconstruction error of missing data by up to 28% over standard Time Series Transformers.',
+      'Extended the framework with a patched variant that gives each patch of a sensing cycle its own selector layer, testing whether intra-cycle structure (e.g. morning, afternoon, night) improves selection.',
+      'Benchmarked both on Urban Air (437 stations, hourly) and SensorScope St-Bernard (31 sensors, two-minute); found the patched variant improves only in isolated settings, likely from lost cross-patch attention.',
+      "Published a first-author full paper and a follow-on extended abstract at IPCCC '25.",
     ],
   },
   {
@@ -84,8 +85,19 @@ const experience = [
     org: 'Independent Research · Los Angeles, CA',
     when: 'Sep 2022 — Feb 2023',
     bullets: [
-      'Reduced item under-recommendation bias while cutting training costs in Debiased Bayesian Personalized Ranking by replacing an adversarial debiasing network with an autoencoder plus ranking post-processing.',
-      "Published as a co-author at ISCAIS '23.",
+      'Reduced item under-recommendation bias while cutting training costs in Bayesian Personalized Ranking by replacing an adversarial debiasing network with an autoencoder plus ranking post-processing.',
+      "Published as a co-author at ISCAIS '23; all four authors contributed equally.",
+    ],
+  },
+];
+
+const teaching = [
+  {
+    role: 'Math & CS Tutor (Part-time)',
+    org: 'Mathematics Center, Oxford College of Emory University · Oxford, GA',
+    when: 'Sep 2025 — Dec 2025',
+    bullets: [
+      'Tutored undergraduates across the introductory calculus sequence (MATH 111 Calculus I, MATH 112 Calculus II) and the computer science core (CS 170/171 Introduction to Computer Science I–II, CS 253 Data Structures and Algorithms).',
     ],
   },
 ];
@@ -135,7 +147,7 @@ const skills = [
         publications.map((p) => (
           <div class="entry">
             <h3>
-              {/* Unpublished work has no DOI to point at yet. */}
+              {/* Nothing to link until there's a DOI or preprint URL. */}
               {p.href ? (
                 <a href={p.href} target="_blank" rel="noopener">
                   {p.title}
@@ -155,6 +167,24 @@ const skills = [
       <h2>Experience</h2>
       {
         experience.map((e) => (
+          <div class="entry">
+            <h3>{e.role}</h3>
+            <span class="when">{e.when}</span>
+            <span class="where">{e.org}</span>
+            <ul class="bullets">
+              {e.bullets.map((b) => (
+                <li>{b}</li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </section>
+
+    <section>
+      <h2>Teaching</h2>
+      {
+        teaching.map((e) => (
           <div class="entry">
             <h3>{e.role}</h3>
             <span class="when">{e.when}</span>
