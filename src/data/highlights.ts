@@ -34,6 +34,7 @@ export const highlights: Highlight[] = [
         meta: "Preprint",
         status: "preprint",
         blurb: "A de-identified dataset of 64,479 child care providers across 12 U.S. states, curated from state QRIS portals by an LLM pipeline and released on Hugging Face, with within-state and leave-one-state-out benchmarks over tabular models and language models.",
+        href: "https://arxiv.org/abs/2610.05863",
     },
     {
         title: "Physiological Identifiability of Type 1 Diabetes Digital Twins Under Behavioral Heterogeneity",

@@ -21,6 +21,7 @@ export const activity: Activity[] = [
     {
         date: "Oct 2025 —",
         title: "Child care quality dataset",
-        text: "CCQ, a de-identified dataset of 64,479 child care providers across 12 U.S. states, curated from state QRIS portals by an LLM pipeline and released on Hugging Face. Benchmarks show tree models win within-state, while zero-shot transfer to a new state lands near chance.",
+        text: "CCQ, a de-identified dataset of 64,479 child care providers across 12 U.S. states, curated from state QRIS portals by an LLM pipeline and released on Hugging Face. Benchmarks show tree models win within-state, while zero-shot transfer to a new state lands near chance. We published a preprint on arXiv in Oct 2026.",
+        href: "https://arxiv.org/abs/2610.05863",
     },
 ];
