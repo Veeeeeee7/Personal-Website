@@ -16,7 +16,8 @@ export const activity: Activity[] = [
     {
         date: "Apr 2026 —",
         title: "Type 1 diabetes digital-twin benchmark",
-        text: "A benchmark that scores Type 1 diabetes digital twins by decision quality — whether a twin ranks candidate insulin treatments the way the real patient would — rather than by trajectory error alone. The two criteria disagree: the worst-RMSE twin ranked treatments second best, while a twin with half the RMSE ranked at chance.",
+        text: "A benchmark that scores Type 1 diabetes digital twins by decision quality — whether a twin ranks candidate insulin treatments the way the real patient would — rather than by trajectory error alone. The two criteria disagree: the worst-RMSE twin ranked treatments second best, while a twin with half the RMSE ranked at chance. We published a preprint on arXiv in Oct 2026.",
+        href: "https://arxiv.org/abs/2610.30577",
     },
     {
         date: "Oct 2025 —",

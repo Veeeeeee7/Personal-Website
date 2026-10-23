@@ -5,8 +5,8 @@ export type Highlight = {
     /** Venue + year, shown as the pill in the card corner. */
     meta: string;
     /**
-     * Drives the pill style and CV ordering. Anything not "published" gets a
-     * muted pill so it doesn't read as a venue.
+     * Drives the pill style and CV ordering. "review" gets a muted pill so it
+     * doesn't read as a venue; arXiv preprints get the same pill as venues.
      */
     status: "published" | "preprint" | "review";
     blurb: string;
@@ -23,15 +23,16 @@ export const highlights: Highlight[] = [
         title: "Evaluating Digital Twins for Type 1 Diabetes by Decision Quality",
         authors:
             "Victor Li, Owen Tucker, Michael S. Hughes, Temiloluwa Prioleau, Shengpu Tang",
-        meta: "Preprint",
+        meta: "arXiv",
         status: "preprint",
         blurb: "An evaluation protocol that scores a Type 1 diabetes digital twin by whether its glucose trajectories rank candidate insulin treatments as the real patient would, not by trajectory error alone. On 30 UVA/Padova virtual patients under 21 treatments, the two criteria disagree: the worst-RMSE twin ranks second best, and a twin with half the RMSE ranks at chance.",
+        href: "https://arxiv.org/abs/2610.30577",
     },
     {
         title: "CCQ: A Multi-State Child Care Quality Dataset to Support AI for Children’s Health Research",
         authors:
             "Victor Li, Yuzhang Xie, Ziwei Dong, Wenjing Ma, Carl Yang, Jinbing Bai, Huiwen Xu, Jiaying Lu",
-        meta: "Preprint",
+        meta: "arXiv",
         status: "preprint",
         blurb: "A de-identified dataset of 64,479 child care providers across 12 U.S. states, curated from state QRIS portals by an LLM pipeline and released on Hugging Face, with within-state and leave-one-state-out benchmarks over tabular models and language models.",
         href: "https://arxiv.org/abs/2610.05863",

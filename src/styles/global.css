@@ -434,7 +434,7 @@ div.card {
   letter-spacing: 0;
 }
 
-/* Preprints and papers under review — mute the pill so it doesn't read as a venue. */
+/* Papers under review — mute the pill so it doesn't read as a venue. */
 .card .meta.pending {
   color: var(--text-faint);
   background: transparent;

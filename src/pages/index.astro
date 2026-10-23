@@ -62,7 +62,7 @@ const columns = Array.from({ length: COLUMN_COUNT }, (_, col) =>
                 <Tag class="card" style={`order:${h.order}`} {...linkAttrs}>
                   <div class="card-head">
                     <h3>{h.title}</h3>
-                    <span class:list={['meta', { pending: h.status !== 'published' }]}>{h.meta}</span>
+                    <span class:list={['meta', { pending: h.status === 'review' }]}>{h.meta}</span>
                   </div>
                   <p class="authors">{h.authors}</p>
                   <p>{h.blurb}</p>
